@@ -1,0 +1,7 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.persistence_export_jobs,platform.persistence_policy_acknowledgements,
+ platform.persistence_policy_assignments,platform.persistence_policy_versions,platform.persistence_telemetry_health,
+ platform.scheduled_task_execution_instances,platform.scheduled_task_configuration_history,
+ platform.scheduled_task_entities,platform.service_configuration_history,platform.service_entities,
+ platform.persistence_events,platform.persistence_batches;
+COMMIT;

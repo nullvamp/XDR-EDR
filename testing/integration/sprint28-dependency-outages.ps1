@@ -1,0 +1,17 @@
+$ErrorActionPreference='Stop';$root=Resolve-Path(Join-Path $PSScriptRoot '..\..');Set-Location $root
+$cfg=@{};Get-Content .env|Where-Object{$_-match'^\s*([^#=\s]+)=(.*)$'}|ForEach-Object{$cfg[$matches[1]]=$matches[2].Trim().Trim('"').Trim("'")}
+$login=Invoke-RestMethod -Method Post 'http://127.0.0.1:8080/api/v1/auth/token' -ContentType application/json -Body(@{username=$cfg.PLATFORM_BOOTSTRAP_USER;password=$cfg.PLATFORM_BOOTSTRAP_PASSWORD}|ConvertTo-Json -Compress);$admin=@{Authorization="Bearer $($login.access_token)"}
+function Ready($url){$watch=[Diagnostics.Stopwatch]::StartNew();$body=$null;try{$response=Invoke-WebRequest -UseBasicParsing "$url/health/ready" -TimeoutSec 12;$code=$response.StatusCode;$body=$response.Content|ConvertFrom-Json}catch{$errorResponse=$_.Exception.Response;$code=if($null-ne$errorResponse){[int]$errorResponse.StatusCode}else{0};$content=if($null-ne$errorResponse-and$null-ne$errorResponse.Content){$errorResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()}elseif($null-ne$errorResponse-and$errorResponse.PSObject.Methods.Name-contains'GetResponseStream'){$reader=[IO.StreamReader]::new($errorResponse.GetResponseStream());try{$reader.ReadToEnd()}finally{$reader.Dispose()}}else{''};if($content){try{$body=$content|ConvertFrom-Json}catch{$body=$null}}};$watch.Stop();[pscustomobject]@{code=$code;milliseconds=[math]::Round($watch.Elapsed.TotalMilliseconds,2);body=$body}}
+function WaitReady($url){$deadline=(Get-Date).AddSeconds(90);do{Start-Sleep 2;$x=Ready $url;if($x.code-eq200){return $x}}while((Get-Date)-lt$deadline);throw "$url did not recover"}
+$checks=[ordered]@{}
+foreach($case in @(@{name='nats';container='deployment-nats-1';expected=200;dependency='messageBus'},@{name='opensearch';container='deployment-opensearch-1';expected=200;dependency='search'},@{name='minio';container='deployment-minio-1';expected=200;dependency='objectStorage'},@{name='postgresql';container='deployment-postgres-1';expected=503;dependency='database';pauseProjection=$true})){
+  if($case.pauseProjection){docker stop deployment-nats-1|Out-Null}
+  docker stop $case.container|Out-Null
+  try {Start-Sleep 3;$observed=Ready 'http://127.0.0.1:8081';$checks[$case.name]=[ordered]@{status=$observed.code;boundedMilliseconds=$observed.milliseconds;reported=$observed.body.dependencies.($case.dependency);truthful=$observed.code-eq$case.expected-and$observed.body.dependencies.($case.dependency)-match'unavailable|degraded'}}
+  finally {docker start $case.container|Out-Null;if($case.pauseProjection){docker start deployment-nats-1|Out-Null}}
+  $null=WaitReady 'http://127.0.0.1:8081'
+}
+$postRecovery=(Invoke-RestMethod 'http://127.0.0.1:8081/api/v1/ha/status' -Headers $admin).data
+$outbox=(docker exec deployment-postgres-1 psql -U platform -d platform -Atc "select count(*) filter(where published_at is null and failed_at is null)||'|'||count(*) filter(where failed_at is not null) from platform.outbox;").Trim().Split('|')
+$report=[ordered]@{schemaVersion='sprint28-dependency-outages.v1';executedAt=[DateTimeOffset]::UtcNow.ToString('o');profile='C';checks=$checks;postRecovery=[ordered]@{gatewayBInstances=@($postRecovery.instances|Where-Object{$_.live-and$_.ready}).Count;outboxPending=[int]$outbox[0];outboxFailed=[int]$outbox[1]};passed=@($checks.GetEnumerator()|Where-Object{-not$_.Value.truthful}).Count-eq0-and[int]$outbox[0]-eq0-and[int]$outbox[1]-eq0}
+$report|ConvertTo-Json -Depth 10|Set-Content artifacts/sprint28-dependency-outages.json -Encoding utf8;$report|ConvertTo-Json -Depth 10;if(-not$report.passed){exit 1}

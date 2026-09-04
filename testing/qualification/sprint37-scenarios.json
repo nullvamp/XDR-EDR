@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "sprint37-scenarios.v1",
+  "version": 1,
+  "safety": {
+    "target": "Hyper-V VM XDR-Victim-Sprint18 only",
+    "developmentHostNativeResponseProhibited": true,
+    "realMalware": false,
+    "destructiveImpact": false,
+    "fixtureRoot": "C:\\Users\\Public\\Sprint37Qualification"
+  },
+  "scenarios": [
+    {
+      "id": "S37-A",
+      "campaign": "Initial execution",
+      "attackBehaviors": ["Ingress staging", "Command and Scripting Interpreter", "Process Discovery", "Application Layer Protocol"],
+      "expectedTelemetry": ["File", "Process", "Module", "Execution", "Dns", "Network"],
+      "requiredDetections": ["Executable created in public user directory", "PowerShell encoded or obfuscated command", "Process discovery via tasklist"],
+      "requiredCorrelations": ["rapid-create-execute", "dns-network-chain"],
+      "negativeControl": "Signed Windows PowerShell writes and reads a benign text file without encoded arguments",
+      "analystPivots": ["process tree", "entity graph", "timeline", "hunt"],
+      "cleanup": ["remove staged files", "verify child processes exited"]
+    },
+    {
+      "id": "S37-B",
+      "campaign": "Persistence",
+      "attackBehaviors": ["Registry Run Keys", "Scheduled Task", "Windows Service"],
+      "expectedTelemetry": ["Registry", "Persistence", "Process", "File"],
+      "requiredDetections": ["Registry Run key persistence change", "Scheduled task created for public-path payload", "Service created from user-writable path"],
+      "requiredCorrelations": ["autorun-then-execute"],
+      "negativeControl": "Repository fixture creates no broad or hidden persistence",
+      "analystPivots": ["persistence generation", "related process", "attack story"],
+      "cleanup": ["delete Run value", "delete scheduled task", "delete service", "remove payload"]
+    },
+    {
+      "id": "S37-C",
+      "campaign": "Identity and access",
+      "attackBehaviors": ["Password Guessing", "Valid Accounts"],
+      "expectedTelemetry": ["Identity", "Process"],
+      "requiredDetections": ["Repeated failed logons for one account"],
+      "requiredCorrelations": ["failed-then-success"],
+      "negativeControl": "Normal existing administrative session",
+      "sourceLimitations": ["No remote attribution is inferred from local fixtures"],
+      "cleanup": ["delete temporary local account", "remove temporary SMB mappings"]
+    },
+    {
+      "id": "S37-D",
+      "campaign": "Discovery",
+      "attackBehaviors": ["System Owner Discovery", "System Information Discovery", "Process Discovery", "Account Discovery", "Network Configuration Discovery"],
+      "expectedTelemetry": ["Process", "Module", "Execution"],
+      "requiredDetections": ["System owner discovery via whoami", "System information discovery", "Process discovery via tasklist", "Local account discovery via net", "Command shell network discovery"],
+      "requiredCorrelations": [],
+      "negativeControl": "Get-Date and hostname inventory commands",
+      "cleanup": ["verify discovery commands exited"]
+    },
+    {
+      "id": "S37-E",
+      "campaign": "Defense evasion and self-protection",
+      "attackBehaviors": ["Impair Defenses", "Masquerading"],
+      "expectedTelemetry": ["File", "Registry", "Persistence"],
+      "requiredDetections": ["DLL created in user-writable path", "agent.file.replaced", "agent.service.disabled"],
+      "requiredCorrelations": [],
+      "negativeControl": "No real Windows security control is disabled",
+      "sourceLimitations": ["Tamper attempts use the Sprint 26 bounded self-test, not the installed agent"],
+      "cleanup": ["remove replacement fixture", "verify self-test service/firewall artifacts absent"]
+    },
+    {
+      "id": "S37-F",
+      "campaign": "Network and tunnel",
+      "attackBehaviors": ["Proxy", "Protocol Tunneling", "DNS Tunneling"],
+      "expectedTelemetry": ["Dns", "Network"],
+      "requiredDetections": ["Unusual DNS TXT query", "tunnel finding"],
+      "requiredCorrelations": ["exact tunnel chain"],
+      "negativeControl": "Normal DNS and approved proxy fixture are suppressed",
+      "sourceLimitations": ["ICMP tunneling is NOT OBSERVABLE BY SOURCE"],
+      "cleanup": ["stop tunnel fixtures", "remove tunnel files"]
+    },
+    {
+      "id": "S37-G",
+      "campaign": "Multi-stage incident",
+      "attackBehaviors": ["Ingress staging", "Execution", "Discovery", "Persistence", "Command and Control", "Identity context"],
+      "expectedTelemetry": ["Process", "File", "Registry", "Network", "Dns", "Module", "Persistence", "Identity", "Execution"],
+      "requiredDetections": ["production multi-domain finding set"],
+      "requiredCorrelations": ["rapid-create-execute", "autorun-then-execute", "dns-network-chain"],
+      "expectedAlertRange": {"minimum": 1, "maximum": 50},
+      "analystPivots": ["incident", "timeline", "process tree", "entity graph", "attack story", "ATT&CK", "AI", "hunt"],
+      "cleanup": ["run all campaign cleanup", "verify endpoint unisolated", "verify agent running"]
+    }
+  ]
+}

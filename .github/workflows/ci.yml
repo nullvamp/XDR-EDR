@@ -1,0 +1,161 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions: {contents: read, packages: write}
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with: {dotnet-version: 8.0.423}
+      - run: dotnet restore SecurityPlatform.sln --configfile NuGet.Config
+      - run: dotnet format SecurityPlatform.sln --verify-no-changes --no-restore
+      - run: node --check frontend/app.js
+      - run: dotnet build SecurityPlatform.sln -c Release --no-restore
+      - run: dotnet run --no-build -c Release --project testing/Platform.Tests/Platform.Tests.csproj
+      - run: dotnet list SecurityPlatform.sln package --vulnerable --include-transitive
+      - run: dotnet tool install --tool-path .tools dotnet-coverage --version 18.10.0
+      - run: .tools/dotnet-coverage collect "dotnet run --no-build -c Release --project testing/Platform.Tests/Platform.Tests.csproj" -f cobertura -o coverage.cobertura.xml
+  credential-storage:
+    strategy:
+      matrix: {os: [ubuntu-latest, windows-latest, macos-latest]}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with: {dotnet-version: 8.0.423}
+      - run: dotnet restore agent/core/Platform.Agent/Platform.Agent.csproj --configfile NuGet.Config
+      - name: Validate native credential store
+        shell: pwsh
+        env:
+          PLATFORM_CREDENTIAL_STORE_SELF_TEST: true
+          PLATFORM_AGENT_DATA: ${{ runner.temp }}/platform-agent-credentials
+          PLATFORM_ENVIRONMENT: production
+        run: dotnet run --project agent/core/Platform.Agent/Platform.Agent.csproj
+  windows-etw-runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with: {dotnet-version: 8.0.423}
+      - run: dotnet restore agent/core/Platform.Agent/Platform.Agent.csproj --configfile NuGet.Config
+      - name: Execute ETW process lifecycle runtime test
+        shell: pwsh
+        env: {PLATFORM_PROCESS_COLLECTOR_SELF_TEST: true}
+        run: |
+          dotnet build tools/ProcessGenerator/ProcessGenerator.csproj -c Release
+          $env:PLATFORM_PROCESS_TEST_COUNT='500'
+          $env:PLATFORM_PROCESS_TEST_CONCURRENCY='20'
+          $env:PLATFORM_PROCESS_GENERATOR_PATH=(Resolve-Path tools/ProcessGenerator/bin/Release/net8.0/ProcessGenerator.exe).Path
+          dotnet run --project agent/core/Platform.Agent/Platform.Agent.csproj | Tee-Object windows-etw.json
+      - name: Execute elevated ETW registry collector self-test
+        shell: pwsh
+        env:
+          PLATFORM_REGISTRY_COLLECTOR_SELF_TEST: true
+          PLATFORM_REGISTRY_TEST_COUNT: 50
+        run: dotnet run --project agent/core/Platform.Agent/Platform.Agent.csproj | Tee-Object windows-registry-etw.json
+      - name: Execute elevated ETW network collector self-test
+        shell: pwsh
+        env:
+          PLATFORM_NETWORK_COLLECTOR_SELF_TEST: true
+          PLATFORM_NETWORK_COLLECTOR_SELF_TEST_OUTPUT: windows-network-etw.json
+          PLATFORM_AGENT_DATA: ${{ runner.temp }}/platform-agent-network
+        run: dotnet run --project agent/core/Platform.Agent/Platform.Agent.csproj
+  macos-build:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with: {dotnet-version: 8.0.423}
+      - run: dotnet build agent/core/Platform.Agent/Platform.Agent.csproj -c Release
+      - name: Validate native Endpoint Security collector
+        env: {PLATFORM_MACOS_ALLOW_COMPILE_ONLY: true}
+        run: ./agent/macos/EndpointSecurityCollector/build.sh
+  containers:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -f deployment/docker/service.Dockerfile -t open-security-platform/service:${{ github.sha }} .
+      - run: docker build -f deployment/docker/agent.Dockerfile -t open-security-platform/agent:${{ github.sha }} .
+  production-integration:
+    runs-on: ubuntu-latest
+    needs: build-test
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with: {dotnet-version: 8.0.423}
+      - name: Configure isolated CI runtime
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'PLATFORM_JWT_SIGNING_KEY=ci-only-signing-key-at-least-thirty-two-characters' \
+            'PLATFORM_BOOTSTRAP_USER=admin' \
+            'PLATFORM_BOOTSTRAP_PASSWORD=ci-only-bootstrap-password' \
+            'PLATFORM_ENROLLMENT_PEPPER=ci-only-enrollment-pepper-at-least-thirty-two' \
+            'PLATFORM_BOOTSTRAP_TENANT_ID=00000000-0000-0000-0000-000000000002' \
+            'PLATFORM_ENROLLMENT_TOKEN_ID=00000000-0000-0000-0000-000000000001' \
+            'PLATFORM_ENROLLMENT_TOKEN_SECRET=ci-placeholder-secret-at-least-thirty-two-bytes' \
+            'POSTGRES_PASSWORD=ci-only-postgres-password' \
+            'MINIO_ROOT_USER=platform' \
+            'MINIO_ROOT_PASSWORD=ci-only-minio-password' \
+            'MINIO_APP_USER=platform-app' \
+            'MINIO_APP_PASSWORD=ci-only-minio-app-password' > .env
+          dotnet run --project tools/Platform.Pki/Platform.Pki.csproj -- deployment/certificates ci-only-postgres-password
+      - name: Production integration and tenant-isolation suite
+        shell: pwsh
+        run: ./testing/integration/run.ps1 -StartStack
+      - name: Certificate lifecycle suite
+        shell: pwsh
+        run: ./testing/integration/certificate-lifecycle.ps1
+      - name: NATS duplicate and redelivery suite
+        shell: pwsh
+        run: ./testing/integration/nats-acceptance.ps1
+      - name: Infrastructure failure and persistence suite
+        shell: pwsh
+        run: ./testing/integration/failure-recovery.ps1
+      - name: Process telemetry vertical-slice suite
+        shell: pwsh
+        env:
+          PLATFORM_BOOTSTRAP_PASSWORD: ci-only-bootstrap-password
+        run: ./testing/integration/process-telemetry.ps1
+      - name: Network telemetry production and tenant-isolation suite
+        shell: pwsh
+        run: ./testing/integration/sprint5-network-api-matrix.ps1
+      - name: Network telemetry dependency recovery suite
+        shell: pwsh
+        run: ./testing/integration/sprint5-network-failure-recovery.ps1
+      - name: Outbox capacity and drain
+        shell: pwsh
+        run: ./testing/integration/outbox-capacity.ps1
+      - name: Linux infrastructure restart profile
+        shell: pwsh
+        run: ./testing/integration/linux-profile-e.ps1
+      - name: Production tenant isolation
+        shell: pwsh
+        run: ./testing/integration/sprint2c-isolation.ps1
+      - name: Policy rollback and invalid-policy rejection
+        shell: pwsh
+        run: ./testing/integration/sprint2c-policy.ps1
+      - name: Validate OpenAPI document
+        shell: bash
+        run: curl -fsS http://localhost:8080/api/v1/openapi.json | jq -e '.openapi == "3.1.0" and .paths["/health/ready"] and .paths["/api/v1/processes"] and .paths["/api/v1/endpoints/{endpointId}/processes/{entityId}/tree"]'
+      - name: Browser accessibility audit
+        run: |
+          npm install --prefix .tooling/a11y puppeteer-core@24.16.0 axe-core@4.10.3 --no-audit --no-fund
+          node testing/accessibility/authenticated-process.mjs
+          node testing/accessibility/authenticated-registry.mjs
+          node testing/accessibility/registry-keyboard-matrix.mjs
+          node testing/accessibility/authenticated-network.mjs
+          node testing/accessibility/network-keyboard-matrix.mjs
+      - name: Container vulnerability scan
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.67.2 image --exit-code 1 --severity CRITICAL deployment-gateway:latest
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.67.2 image --exit-code 1 --severity CRITICAL deployment-agent:latest
+          docker run --rm -v "$PWD:/workspace" aquasec/trivy:0.67.2 fs --scanners secret --exit-code 1 --skip-dirs /workspace/deployment/certificates --skip-files /workspace/.env /workspace
+      - if: always()
+        run: docker compose -f deployment/docker-compose.yml --env-file .env down -v

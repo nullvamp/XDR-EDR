@@ -1,0 +1,11 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.registry_export_jobs;
+DROP TABLE IF EXISTS platform.registry_policy_acknowledgements;
+DROP TABLE IF EXISTS platform.registry_policy_assignments;
+DROP TABLE IF EXISTS platform.registry_policy_versions;
+DROP TABLE IF EXISTS platform.registry_telemetry_health;
+DROP TABLE IF EXISTS platform.registry_value_entities;
+DROP TABLE IF EXISTS platform.registry_key_entities;
+DROP TABLE IF EXISTS platform.registry_events;
+DROP TABLE IF EXISTS platform.registry_batches;
+COMMIT;

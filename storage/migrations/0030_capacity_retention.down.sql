@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS platform.storage_domain_samples;
+DROP TABLE IF EXISTS platform.capacity_samples;
+DROP TABLE IF EXISTS platform.tenant_rate_windows;
+DROP TABLE IF EXISTS platform.tenant_capacity_quotas;
+DROP TABLE IF EXISTS platform.cleanup_history;
+DROP TABLE IF EXISTS platform.archive_jobs;
+DROP TABLE IF EXISTS platform.retention_fixture_records;
+DROP TABLE IF EXISTS platform.retention_runs;
+DROP TABLE IF EXISTS platform.retention_previews;
+DROP TABLE IF EXISTS platform.retention_holds;
+DROP TABLE IF EXISTS platform.retention_policies;

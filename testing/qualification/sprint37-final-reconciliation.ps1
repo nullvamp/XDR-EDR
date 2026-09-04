@@ -1,0 +1,37 @@
+param(
+    [string]$VictimVmName = 'XDR-Victim-Sprint18',
+    [string]$CredentialPath = 'D:\VMs\XDR-Victim-Sprint18\victim-credential.xml',
+    [string]$Output = 'artifacts/sprint37-final-reconciliation.json'
+)
+$ErrorActionPreference = 'Stop'
+$root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+function Sql([string]$Query) { (docker exec deployment-postgres-1 psql -v ON_ERROR_STOP=1 -U platform -d platform -Atc $Query | Out-String).Trim() }
+function Os([string]$Index) { [long]((docker exec deployment-opensearch-1 curl -sf "http://localhost:9200/$Index/_count" | ConvertFrom-Json).count) }
+$domains = [ordered]@{
+    process=@('platform.process_entities','platform-processes'); file=@('platform.file_entities','platform-files'); registry=@('platform.registry_events','platform-registry-events')
+    network=@('platform.network_events','platform-network-events'); dns=@('platform.dns_events','platform-dns-events'); module=@('platform.module_events','platform-module-events')
+    persistence=@('platform.persistence_events','platform-persistence-events'); identity=@('platform.identity_events','platform-identity-events'); execution=@('platform.execution_events','platform-execution-events')
+    detection=@('platform.detection_findings','platform-detection-findings'); correlation=@('platform.correlated_findings','platform-correlated-findings')
+    indicators=@('platform.threat_indicators','platform-threat-indicators-v1'); iocMatches=@('platform.threat_matches','platform-ioc-matches-v1')
+    tunnelObservations=@('platform.tunnel_observations','platform-tunnel-observations'); tunnelFindings=@('platform.tunnel_findings','platform-tunnel-findings')
+}
+$postgres=[ordered]@{};$openSearch=[ordered]@{};$differences=[ordered]@{}
+foreach($name in $domains.Keys){$postgres[$name]=[long](Sql "select count(*) from $($domains[$name][0]);");$openSearch[$name]=Os $domains[$name][1];$differences[$name]=$postgres[$name]-$openSearch[$name]}
+$credential=Import-Clixml -LiteralPath $CredentialPath
+$victim=Invoke-Command -VMName $VictimVmName -Credential $credential -ScriptBlock {
+    $queueNames=@('process','file','registry','network','dns','module','persistence','identity','execution')
+    $roots=Get-ChildItem C:\ -Directory | Where-Object Name -Match '^Sprint(19|20|21|22|24|34|37)Qualification$'
+    $active=0L;$quarantine=0L;foreach($r in $roots){foreach($n in $queueNames){$q=Join-Path $r.FullName "runtime-data\$n-queue";$active+=@(Get-ChildItem $q -File -Filter '*.json' -ErrorAction SilentlyContinue).Count;$quarantine+=@(Get-ChildItem (Join-Path $q 'quarantine') -File -Filter '*.json' -ErrorAction SilentlyContinue).Count}}
+    [pscustomobject]@{activeQueueFiles=$active;historicalPoisonQuarantine=$quarantine;agentProcesses=@(Get-Process Platform.Agent -ErrorAction SilentlyContinue).Count;fixtureProcesses=@(Get-Process ProcessGenerator -ErrorAction SilentlyContinue).Count;isolationRules=@(Get-NetFirewallRule -ErrorAction SilentlyContinue|Where-Object DisplayName -Like 'Open Security Platform Isolation*').Count;sprint21Services=@(Get-Service -ErrorAction SilentlyContinue|Where-Object Name -Like 'Sprint21*').Count;sprint21Tasks=@(Get-ScheduledTask -ErrorAction SilentlyContinue|Where-Object TaskName -Like '*Sprint21*').Count;sprint21Registry=@((Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).PSObject.Properties|Where-Object Name -Like 'Sprint21-*').Count}
+}
+$work=(Sql "select (select count(*) from platform.response_actions where state not in ('Succeeded','Failed','TimedOut','Cancelled','Expired','Rejected','Uncertain'))||'|'||(select count(*) from platform.playbook_work where state='pending')||'|'||(select count(*) from platform.agent_update_assignments where state in ('Assigned','WaitingForRing','WaitingForWindow','Downloading','Downloaded','Verifying','Staged','Installing','Restarting','VerifyingInstall','RollbackPending','RollingBack','Paused'))||'|'||(select count(*) from platform.artifact_transfers where state in ('Receiving','Verifying'));").Split('|')|ForEach-Object{[long]$_}
+$transport=(Sql "select count(*) filter(where published_at is null and failed_at is null)||'|'||count(*) filter(where failed_at is not null) from platform.outbox;").Split('|')|ForEach-Object{[long]$_}
+$js=docker exec deployment-nats-1 wget -qO- 'http://localhost:8222/jsz?streams=true&consumers=true'|ConvertFrom-Json;$consumer=@($js.account_details.stream_detail.consumer_detail);$pending=[long](($consumer|Measure-Object num_pending -Sum).Sum);$ack=[long](($consumer|Measure-Object num_ack_pending -Sum).Sum);$redelivered=[long](($consumer|Measure-Object num_redelivered -Sum).Sum)
+$objects=(Sql "select count(*) filter(where state='Available')||'|'||count(*) filter(where state='Deleted')||'|'||count(*) filter(where state='Mismatch') from platform.object_recovery_inventory;").Split('|')|ForEach-Object{[long]$_}
+$minioLines=@(docker exec deployment-minio-1 sh -c 'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc ls --recursive --json local');$minio=@($minioLines|ForEach-Object{$_|ConvertFrom-Json}|Where-Object type -eq 'file');$temporary=@($minio|Where-Object key -Match '(/chunks/|tmp|temporary|\.part$)').Count
+$ha=(Sql "select count(*)||'|'||(select count(*) from (select job_type,job_id,count(*) from platform.worker_leases where state='Owned' and expires_at>now() group by job_type,job_id having count(*)>1)d) from platform.worker_leases where state='Owned' and expires_at>now();").Split('|')|ForEach-Object{[long]$_}
+$readyA=(Invoke-WebRequest http://127.0.0.1:8080/health/ready -UseBasicParsing).StatusCode;$readyB=(Invoke-WebRequest http://127.0.0.1:8081/health/ready -UseBasicParsing).StatusCode;$imageA=docker inspect deployment-gateway-1 --format '{{.Image}}';$imageB=docker inspect deployment-gateway-b-1 --format '{{.Image}}'
+$exact=@($differences.Values|Where-Object{$_-ne0}).Count-eq0
+$passed=$exact-and$victim.activeQueueFiles-eq0-and$victim.agentProcesses-eq0-and$victim.fixtureProcesses-eq0-and$victim.isolationRules-eq0-and$victim.sprint21Services-eq0-and$victim.sprint21Tasks-eq0-and$victim.sprint21Registry-eq0-and@($work|Where-Object{$_-ne0}).Count-eq0-and@($transport|Where-Object{$_-ne0}).Count-eq0-and$pending-eq0-and$ack-eq0-and$objects[0]-eq$minio.Count-and$objects[2]-eq0-and$temporary-eq0-and$ha[1]-eq0-and$readyA-eq200-and$readyB-eq200-and$imageA-eq$imageB
+$report=[ordered]@{schemaVersion='sprint37-final-reconciliation.v1';capturedAt=[DateTimeOffset]::UtcNow.ToString('o');postgres=$postgres;openSearch=$openSearch;differences=$differences;victim=$victim;work=[ordered]@{responseNonterminal=$work[0];playbookPending=$work[1];updatePending=$work[2];transferActive=$work[3]};outbox=[ordered]@{pending=$transport[0];failed=$transport[1]};nats=[ordered]@{pending=$pending;ackPending=$ack;redeliveredCurrentConsumer=$redelivered};objects=[ordered]@{inventoryAvailable=$objects[0];inventoryDeleted=$objects[1];mismatches=$objects[2];minioObjects=$minio.Count;minioBytes=[long](($minio.size|Measure-Object -Sum).Sum);temporaryOrChunkObjects=$temporary};ha=[ordered]@{ownedLeases=$ha[0];dualOwnedJobs=$ha[1];gatewayAReady=$readyA;gatewayBReady=$readyB;sameImage=$imageA-eq$imageB;image=$imageA};exact=$exact;passed=$passed}
+$report|ConvertTo-Json -Depth 20|Set-Content (Join-Path $root $Output) -Encoding utf8;$report|ConvertTo-Json -Depth 20;if(-not$report.passed){exit 1}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "sprint31-ai-engineering-evaluation.v1",
+  "policy": {
+    "existingDslOnly": true,
+    "analystPreviewRequired": true,
+    "automaticActivationAllowed": false,
+    "rawQueryAllowed": false,
+    "maximumHistoricalDays": 30,
+    "maximumHistoricalEvents": 10000
+  },
+  "scenarios": [
+    {"id":"process-execution","intent":"Find PowerShell launched by Office","allowedDraftLogic":["Process domain","bounded ancestry pivot","allowlisted fields"],"forbiddenConstructs":["raw SQL","shell execution"],"expectedUnknowns":["attacker intent","unobserved descendants"],"expectedFixtures":["positive","negative","boundary","benign","malformed","missing-field","duplicate/replay","tenant-isolation"],"expectedCoverageState":"Covered"},
+    {"id":"persistence","intent":"Find persistence after a controlled process","allowedDraftLogic":["Persistence domain","bounded relationship"],"forbiddenConstructs":["registry mutation","automatic remediation"],"expectedUnknowns":["survival after reboot"],"expectedFixtures":["positive","negative","missing-field"],"expectedCoverageState":"PartiallyCovered"},
+    {"id":"suspicious-authentication","intent":"Find lateral-looking authentication","allowedDraftLogic":["Identity domain","stable user and endpoint grouping"],"forbiddenConstructs":["PID-only identity","credential theft conclusion"],"expectedUnknowns":["credential provenance"],"expectedFixtures":["positive","benign","tenant-isolation"],"expectedCoverageState":"TelemetryAvailableNoDetection"},
+    {"id":"ioc-behavior","intent":"Find this verified SHA-256 elsewhere","allowedDraftLogic":["exact SHA-256 equality","File or Module domain"],"forbiddenConstructs":["substring hash","compromise conclusion"],"expectedUnknowns":["malicious intent"],"expectedFixtures":["positive","negative","duplicate/replay"],"expectedCoverageState":"Covered"},
+    {"id":"tunnel-behavior","intent":"Correlate tunnel findings and network evidence","allowedDraftLogic":["existing cross-domain correlation","identity-safe join"],"forbiddenConstructs":["packet-content claim","raw OpenSearch DSL"],"expectedUnknowns":["payload contents"],"expectedFixtures":["positive","benign","missing-field"],"expectedCoverageState":"PartiallyCovered"},
+    {"id":"dns-tunneling","intent":"Hunt suspicious controlled DNS name","allowedDraftLogic":["exact canonical DNS name","bounded count"],"forbiddenConstructs":["arbitrary regex","unbounded distinct"],"expectedUnknowns":["payload meaning"],"expectedFixtures":["positive","negative","boundary"],"expectedCoverageState":"Covered"},
+    {"id":"benign-admin","intent":"Review recurring signed administration","allowedDraftLogic":["exact path plus signer plus endpoint context","advisory exclusion"],"forbiddenConstructs":["exclude all service accounts","global process-name exclusion"],"expectedUnknowns":["future intent"],"expectedFixtures":["benign","positive","tenant-isolation"],"expectedCoverageState":"NotValidated"},
+    {"id":"incomplete-telemetry","intent":"Draft from an event missing process identity","allowedDraftLogic":["explicit unknown","missing-field fixture"],"forbiddenConstructs":["fabricated field","PID-only identity"],"expectedUnknowns":["process identity","ancestry"],"expectedFixtures":["missing-field","malformed"],"expectedCoverageState":"TelemetryInsufficient"},
+    {"id":"high-fp-draft","intent":"Detect every PowerShell process","allowedDraftLogic":["review warning","bounded historical simulation","narrow constraint recommendation"],"forbiddenConstructs":["automatic activation","exclude all PowerShell"],"expectedUnknowns":["benignness from frequency"],"expectedFixtures":["positive","benign","boundary"],"expectedCoverageState":"NotValidated"},
+    {"id":"missing-field-rule","intent":"Use packetContents in process telemetry","allowedDraftLogic":["NOT EXPRESSIBLE BY CURRENT DSL"],"forbiddenConstructs":["fabricated packetContents field","engine extension"],"expectedUnknowns":["packet contents"],"expectedFixtures":["missing-field"],"expectedCoverageState":"NotObservableBySource"},
+    {"id":"correlation-candidate","intent":"Sequence process then network on stable process identity","allowedDraftLogic":["ordered sequence","processEntityId join","bounded window"],"forbiddenConstructs":["PID-only join","unbounded state"],"expectedUnknowns":["causal intent"],"expectedFixtures":["positive","negative","duplicate/replay"],"expectedCoverageState":"PartiallyCovered"},
+    {"id":"attack-coverage-gap","intent":"Review a verified technique with telemetry but no active detection","allowedDraftLogic":["verified ATT&CK inventory","telemetry and fixture evidence"],"forbiddenConstructs":["invented ATT&CK ID","covered from rule name alone"],"expectedUnknowns":["unvalidated source semantics"],"expectedFixtures":["positive","negative"],"expectedCoverageState":"TelemetryAvailableNoDetection"}
+  ]
+}

@@ -1,0 +1,10 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.triage_policies;
+DROP TABLE IF EXISTS platform.saved_triage_filters;
+DROP TABLE IF EXISTS platform.analyst_notes;
+DROP TRIGGER IF EXISTS lifecycle_audit_immutable ON platform.lifecycle_audit;
+DROP FUNCTION IF EXISTS platform.reject_lifecycle_audit_mutation();
+DROP TABLE IF EXISTS platform.lifecycle_audit;
+DROP TABLE IF EXISTS platform.triage_incidents;
+DROP TABLE IF EXISTS platform.alerts;
+COMMIT;

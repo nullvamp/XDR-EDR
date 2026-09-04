@@ -1,0 +1,15 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.correlation_exports;
+DROP TABLE IF EXISTS platform.correlation_health;
+DROP TABLE IF EXISTS platform.correlation_runs;
+DROP TABLE IF EXISTS platform.correlated_finding_history;
+DROP TABLE IF EXISTS platform.correlated_findings;
+DROP TABLE IF EXISTS platform.correlation_state_observations;
+DROP TABLE IF EXISTS platform.correlation_processed_observations;
+DROP TABLE IF EXISTS platform.correlation_observations;
+DROP TABLE IF EXISTS platform.correlation_exclusions;
+DROP TABLE IF EXISTS platform.correlation_assignments;
+DROP TABLE IF EXISTS platform.correlation_rule_tests;
+DROP TABLE IF EXISTS platform.correlation_rules;
+DROP TABLE IF EXISTS platform.correlation_packs;
+COMMIT;

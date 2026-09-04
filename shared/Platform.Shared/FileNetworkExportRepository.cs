@@ -1,0 +1,12 @@
+namespace OpenSecurityPlatform.Foundation;
+public sealed class FileNetworkExportRepository : INetworkExportRepository
+{
+    readonly object _gate = new(); readonly Dictionary<Guid, NetworkExportJob> _jobs = [];
+    public Task<NetworkExportJob> CreateAsync(string tenant, string actor, NetworkExportCreateRequest r, CancellationToken ct) { var n = DateTimeOffset.UtcNow; var v = new NetworkExportJob(Guid.NewGuid(), tenant, actor, FileExportState.Pending, r.Format, r.Query, r.Fields ?? [], r.MaximumRecords, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), n, n, n.AddMinutes(15)); lock (_gate) _jobs[v.Id] = v; return Task.FromResult(v); }
+    public Task<NetworkExportJob?> GetAsync(string tenant, Guid id, CancellationToken ct) { lock (_gate) return Task.FromResult(_jobs.TryGetValue(id, out var v) && v.TenantId == tenant ? v : null); }
+    public Task<NetworkExportJob?> ClaimAsync(CancellationToken ct) { lock (_gate) { var v = _jobs.Values.FirstOrDefault(x => x.State == FileExportState.Pending); if (v is null) return Task.FromResult<NetworkExportJob?>(null); v = v with { State = FileExportState.Running, StartedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow }; _jobs[v.Id] = v; return Task.FromResult<NetworkExportJob?>(v); } }
+    public Task CompleteAsync(Guid id, int records, long size, string hash, DateTimeOffset at, CancellationToken ct) { lock (_gate) if (_jobs.TryGetValue(id, out var v)) _jobs[id] = v with { State = FileExportState.Completed, RecordCount = records, OutputSize = size, OutputSha256 = hash, CompletedAt = at, UpdatedAt = at }; return Task.CompletedTask; }
+    public Task FailAsync(Guid id, string code, string summary, CancellationToken ct) { lock (_gate) if (_jobs.TryGetValue(id, out var v)) _jobs[id] = v with { State = FileExportState.Failed, ErrorCode = code, ErrorSummary = summary, UpdatedAt = DateTimeOffset.UtcNow }; return Task.CompletedTask; }
+    public Task<IReadOnlyList<NetworkExportJob>> ExpireDueAsync(CancellationToken ct) { lock (_gate) { var a = _jobs.Values.Where(x => x.State == FileExportState.Completed && x.ExpiresAt <= DateTimeOffset.UtcNow).ToArray(); foreach (var v in a) _jobs[v.Id] = v with { State = FileExportState.Expired, UpdatedAt = DateTimeOffset.UtcNow }; return Task.FromResult<IReadOnlyList<NetworkExportJob>>(a); } }
+    public Task AuditDownloadAsync(string tenant, Guid id, string actor, CancellationToken ct) => Task.CompletedTask;
+}

@@ -1,0 +1,15 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.service_registrations;
+DROP TABLE IF EXISTS platform.endpoint_inventory_summaries;
+DROP TABLE IF EXISTS platform.agent_heartbeats;
+DROP TABLE IF EXISTS platform.idempotency_records;
+DROP TABLE IF EXISTS platform.enrollment_attempts;
+DROP TABLE IF EXISTS platform.agent_credentials;
+DROP TABLE IF EXISTS platform.endpoint_identities;
+DROP TABLE IF EXISTS platform.enrollment_tokens;
+DROP TABLE IF EXISTS platform.enrollment_policies;
+ALTER TABLE platform.outbox DROP COLUMN IF EXISTS subject, DROP COLUMN IF EXISTS trace_id, DROP COLUMN IF EXISTS available_at, DROP COLUMN IF EXISTS lease_until, DROP COLUMN IF EXISTS failed_at, DROP COLUMN IF EXISTS safe_failure;
+ALTER TABLE platform.endpoints DROP COLUMN IF EXISTS status, DROP COLUMN IF EXISTS agent_version, DROP COLUMN IF EXISTS inventory, DROP COLUMN IF EXISTS deleted_at;
+ALTER TABLE platform.agents DROP COLUMN IF EXISTS protocol_version, DROP COLUMN IF EXISTS credential_expires_at;
+DELETE FROM platform.schema_migrations WHERE version='0002_endpoint_enrollment';
+COMMIT;

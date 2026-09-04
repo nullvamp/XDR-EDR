@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\Platform.Shared\Platform.Shared.csproj" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="NATS.Net" />
+    <PackageReference Include="Minio" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

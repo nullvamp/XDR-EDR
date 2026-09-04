@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS platform.threat_audit;
+DROP TABLE IF EXISTS platform.threat_health;
+DROP TABLE IF EXISTS platform.threat_exclusions;
+DROP TABLE IF EXISTS platform.threat_match_jobs;
+DROP TABLE IF EXISTS platform.threat_matches;
+DROP TABLE IF EXISTS platform.threat_imports;
+DROP TABLE IF EXISTS platform.threat_relationships;
+DROP TABLE IF EXISTS platform.threat_indicators;
+DROP TABLE IF EXISTS platform.intelligence_sources;

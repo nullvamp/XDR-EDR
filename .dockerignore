@@ -1,0 +1,7 @@
+.tooling
+**/bin
+**/obj
+.git
+agent-data
+data
+*.user

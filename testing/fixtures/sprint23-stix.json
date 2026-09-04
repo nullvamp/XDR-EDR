@@ -1,0 +1,37 @@
+{
+  "type": "bundle",
+  "id": "bundle--23000000-0000-4000-8000-000000000001",
+  "objects": [
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--23000000-0000-4000-8000-000000000002",
+      "created": "2026-08-10T00:00:00Z",
+      "modified": "2026-08-10T00:00:00Z",
+      "valid_from": "2026-08-10T00:00:00Z",
+      "pattern_type": "stix",
+      "pattern": "[domain-name:value = 'sprint23-stix.example']",
+      "confidence": 75,
+      "labels": ["controlled", "sprint23"]
+    },
+    {
+      "type": "malware",
+      "spec_version": "2.1",
+      "id": "malware--23000000-0000-4000-8000-000000000003",
+      "created": "2026-08-10T00:00:00Z",
+      "modified": "2026-08-10T00:00:00Z",
+      "name": "Sprint 23 Controlled Family",
+      "is_family": true
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--23000000-0000-4000-8000-000000000004",
+      "created": "2026-08-10T00:00:00Z",
+      "modified": "2026-08-10T00:00:00Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--23000000-0000-4000-8000-000000000002",
+      "target_ref": "malware--23000000-0000-4000-8000-000000000003"
+    }
+  ]
+}

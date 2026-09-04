@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "third-party-component-inventory.v1",
+  "productVersion": "1.0.0",
+  "scope": "internal-private-engineering-traceability",
+  "legalCertification": false,
+  "technicalReleaseBlocking": false,
+  "components": [
+    {"component":".NET Windows self-contained runtime and libraries","version":"8.0.x locked by runtime pack","license":"Microsoft .NET Library License plus component notices","source":"https://github.com/dotnet/runtime","usage":"Windows agent runtime","distributed":true,"notice":"Include DOTNET-LICENSE.txt and DOTNET-THIRD-PARTY-NOTICES.txt","sourceOffer":"None identified","modified":false},
+    {"component":"System.Diagnostics.EventLog","version":"8.0.1","license":"MIT","source":"https://dot.net/","usage":"Windows event telemetry","distributed":true,"notice":"MIT attribution","sourceOffer":"None","modified":false},
+    {"component":"System.Management","version":"8.0.0","license":"MIT","source":"https://dot.net/","usage":"Windows management telemetry","distributed":true,"notice":"MIT attribution","sourceOffer":"None","modified":false},
+    {"component":"System.Security.Cryptography.ProtectedData","version":"8.0.0","license":"MIT","source":"https://dot.net/","usage":"DPAPI state protection","distributed":true,"notice":"MIT attribution","sourceOffer":"None","modified":false},
+    {"component":"Microsoft.Extensions.Hosting.WindowsServices","version":"8.0.1","license":"MIT","source":"https://dot.net/","usage":"Windows Service hosting","distributed":true,"notice":"MIT attribution","sourceOffer":"None","modified":false},
+    {"component":"Microsoft.Diagnostics.Tracing.TraceEvent","version":"3.2.5","license":"MIT","source":"https://github.com/microsoft/perfview","usage":"Windows ETW collection","distributed":true,"notice":"MIT attribution","sourceOffer":"None","modified":false},
+    {"component":"Npgsql","version":"10.0.3","license":"PostgreSQL","source":"https://github.com/npgsql/npgsql","usage":"PostgreSQL client","distributed":true,"notice":"PostgreSQL license attribution","sourceOffer":"None","modified":false},
+    {"component":"NATS.Net","version":"3.0.1","license":"Apache-2.0","source":"https://github.com/nats-io/nats.net","usage":"NATS client","distributed":true,"notice":"Apache-2.0 license","sourceOffer":"None","modified":false},
+    {"component":"Minio .NET SDK","version":"7.0.0","license":"Apache-2.0","source":"https://github.com/minio/minio-dotnet","usage":"S3-compatible object client","distributed":true,"notice":"Apache-2.0 license","sourceOffer":"None","modified":false},
+    {"component":"ASP.NET Core runtime image","version":"8.0-alpine digest b288317d...","license":"MIT/runtime notices plus Alpine package licenses","source":"mcr.microsoft.com/dotnet/aspnet","usage":"Gateway runtime base","distributed":true,"notice":"Container SBOM and upstream notices","sourceOffer":"Per component SBOM","modified":false},
+    {"component":"krb5-libs / Alpine OS packages","version":"resolved in final image SBOM","license":"Mixed permissive; see SBOM","source":"https://pkgs.alpinelinux.org/","usage":"Gateway runtime dependencies","distributed":true,"notice":"Preserve per-package notices in image/SBOM","sourceOffer":"See APK sources","modified":false},
+    {"component":"PostgreSQL Server","version":"16-alpine","license":"PostgreSQL","source":"https://www.postgresql.org/","usage":"Authoritative deployment dependency","distributed":false,"notice":"Deployment inventory only","sourceOffer":"None","modified":false},
+    {"component":"NATS Server","version":"2.10-alpine","license":"Apache-2.0","source":"https://github.com/nats-io/nats-server","usage":"Deployment message bus","distributed":false,"notice":"Deployment inventory only","sourceOffer":"None","modified":false},
+    {"component":"MinIO Server","version":"RELEASE.2025-04-22T22-12-26Z","license":"AGPL-3.0 / commercial dual license","source":"https://github.com/minio/minio","usage":"Unmodified optional S3-compatible deployment dependency","distributed":false,"notice":"Legal/procurement review required for chosen deployment","sourceOffer":"Upstream source available; obligations depend on deployment/modification","modified":false},
+    {"component":"OpenSearch","version":"2.19.2","license":"Apache-2.0","source":"https://github.com/opensearch-project/OpenSearch","usage":"Search projection deployment dependency","distributed":false,"notice":"Deployment inventory only","sourceOffer":"None","modified":false},
+    {"component":"Falco","version":"0.44.1","license":"Apache-2.0","source":"https://github.com/falcosecurity/falco","usage":"Optional Linux collector deployment profile; not Windows v1","distributed":false,"notice":"Deployment inventory only","sourceOffer":"None","modified":false},
+    {"component":"WiX Toolset","version":"6.0.2","license":"Microsoft Reciprocal License","source":"https://github.com/wixtoolset/wix","usage":"MSI build tool only","distributed":false,"notice":"Not included in product","sourceOffer":"Not applicable to release payload","modified":false},
+    {"component":"Syft","version":"1.50.0","license":"Apache-2.0","source":"https://github.com/anchore/syft","usage":"SBOM build tool only","distributed":false,"notice":"Not included in product","sourceOffer":"None","modified":false},
+    {"component":"Trivy","version":"tool version recorded in validation","license":"Apache-2.0","source":"https://github.com/aquasecurity/trivy","usage":"Vulnerability scanner only","distributed":false,"notice":"Not included in product","sourceOffer":"None","modified":false}
+  ]
+}

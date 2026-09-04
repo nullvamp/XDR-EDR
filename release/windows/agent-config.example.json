@@ -1,0 +1,10 @@
+{
+  "controlPlaneUrl": "https://gateway.example:8443",
+  "enrollmentTokenId": "00000000-0000-0000-0000-000000000000",
+  "enrollmentTokenSecret": "replace-with-one-time-secret",
+  "dataDirectory": "C:\\ProgramData\\OpenSecurityPlatform\\Agent\\data",
+  "caCertificatePath": "C:\\ProgramData\\OpenSecurityPlatform\\Agent\\ca.crt",
+  "environment": "production",
+  "credentialStore": "platform",
+  "forceCertificateRotation": false
+}

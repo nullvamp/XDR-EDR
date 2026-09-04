@@ -1,0 +1,10 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.network_export_jobs;
+DROP TABLE IF EXISTS platform.network_policy_acknowledgements;
+DROP TABLE IF EXISTS platform.network_policy_assignments;
+DROP TABLE IF EXISTS platform.network_policy_versions;
+DROP TABLE IF EXISTS platform.network_telemetry_health;
+DROP TABLE IF EXISTS platform.network_connection_entities;
+DROP TABLE IF EXISTS platform.network_events;
+DROP TABLE IF EXISTS platform.network_batches;
+COMMIT;

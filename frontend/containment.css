@@ -1,0 +1,25 @@
+dialog {
+  max-width: min(580px, calc(100vw - 32px));
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+}
+dialog::backdrop { background: #000a; }
+.containment { margin-top: 24px; border: 2px solid var(--line); border-radius: 14px; }
+.containment-warning { border-left: 4px solid #ffd27d; padding: 10px 12px; background: #ffd27d18; }
+.containment-error { border-left: 4px solid #ff7676; padding: 10px 12px; background: #ff767618; }
+.badge.isolation-isolated { background: #163a31; color: #70efca; }
+.badge.isolation-partial-isolation,
+.badge.isolation-failed,
+.badge.isolation-unknown { background: #491d22; color: #ffb3b3; }
+.containment textarea {
+  min-height: 100px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px;
+}
+.containment button:disabled { cursor: not-allowed; opacity: .55; }

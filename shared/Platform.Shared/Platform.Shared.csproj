@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Stable Sprint Zero contracts and infrastructure abstractions.</Description>
+  </PropertyGroup>
+</Project>

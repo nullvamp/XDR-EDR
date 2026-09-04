@@ -1,0 +1,34 @@
+.live-terminal {
+  min-height: 260px;
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #030708;
+  color: #d9fff5;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  font:
+    13px/1.55 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.live-warning {
+  margin: 12px 0;
+  padding: 12px;
+  border-left: 4px solid #ffd27d;
+  background: var(--panel);
+}
+.badge.active,
+.badge.succeeded {
+  color: #72f1c9;
+}
+.badge.failed,
+.badge.timedout,
+.badge.cancelled,
+.badge.rejected,
+.badge.expired {
+  color: #ff9d9d;
+}

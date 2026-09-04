@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "sprint24-tunnel-rule-fixtures.v1",
+  "rules": [
+    "TUN-001", "TUN-002", "TUN-003", "TUN-004", "TUN-005", "TUN-006", "TUN-007",
+    "TUN-008", "TUN-009", "TUN-010", "TUN-011", "TUN-012", "TUN-013", "TUN-014"
+  ],
+  "caseKinds": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+  "ruleCases": {
+    "TUN-001": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-002": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-003": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-004": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-005": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-006": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-007": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-008": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-009": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-010": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-011": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-012": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-013": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"],
+    "TUN-014": ["positive", "negative", "boundary", "benign", "missing-field", "exclusion"]
+  },
+  "positive": {"evidenceReferences": ["postgresql://platform/sprint24_controlled/event"], "expectedFindings": 1},
+  "negative": {"processNameOnly": true, "expectedFindings": 0},
+  "boundary": {"belowMinimumScore": true, "expectedFindings": 0},
+  "benign": {"tenantExclusion": true, "evidenceRetained": true, "expectedActiveFindings": 0},
+  "limits": {"batch": 256, "pageSize": 200, "chainDepth": 4, "chainNodes": 64, "dnsSamples": 10000, "dnsMinutes": 10}
+}

@@ -1,0 +1,11 @@
+# ADR 0022: Safe Windows endpoint network isolation
+
+Status: accepted and qualified for Windows under Sprint 18 Outcome B-Windows.
+
+Sprint 18 extends the signed response engine with only three predefined actions: `endpoint.isolate`, `endpoint.unisolate`, and `endpoint.isolation_status`. Analysts submit a reason and source context, never firewall rules or allowlists. The gateway resolves the authoritative tenant/endpoint/agent/installation and embeds a versioned server policy containing exact IP/CIDR, port, protocol, direction, and purpose management destinations into the immutable, separately approved, CA-signed action envelope.
+
+Windows enforcement uses persistent Windows Defender Firewall rules in a deterministic installation-derived group. Rules are created and removed only through fixed PowerShell cmdlets with validated, server-signed values. Address-range complements block non-management destinations; management networks are restricted to configured TCP/UDP ports. Inbound traffic is blocked unless explicitly policy-authorized. The implementation never changes profile defaults and never enumerates, captures, alters, or restores unrelated firewall rules.
+
+The agent establishes owned controls, verifies their exact count, verifies every configured outbound TCP management destination, and rolls back the owned group if management survival cannot be guaranteed. Only a verified report can become `Isolated`; otherwise the report is `PartialIsolation` or `Failed`. Unisolation removes only the exact installation-owned group and is idempotent. A durable state file supports restart rediscovery and drift reporting. The canonical backend snapshot accepts only tenant, endpoint, installation, and action-bound reports.
+
+This mechanism deliberately does not install a kernel driver, use undocumented packet filtering, modify routers, trigger automatically from detections, or implement any Sprint 19 response feature. Elevated qualification in the dedicated Hyper-V victim proved effective blocking and restoration, management/Live Response survival, all-domain telemetry continuity, restart rediscovery, offline cancellation/expiry, concurrency, exact cleanup, and zero host firewall mutation.

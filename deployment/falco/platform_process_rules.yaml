@@ -1,0 +1,53 @@
+- rule: Platform Process Start
+  desc: Emit process execution evidence for the platform process-lifecycle adapter.
+  condition: evt.type in (execve, execveat)
+  output: >
+    process start evt.num=%evt.num proc.pid=%proc.pid proc.vpid=%proc.vpid proc.ppid=%proc.ppid proc.pvpid=%proc.pvpid
+    proc.pid.ts=%proc.pid.ts proc.name=%proc.name proc.exepath=%proc.exepath
+    proc.cmdline=%proc.cmdline proc.tty=%proc.tty user.uid=%user.uid
+    group.gid=%group.gid container.id=%container.id container.name=%container.name
+  priority: NOTICE
+  source: syscall
+  tags: [platform, process, lifecycle]
+
+- rule: Platform Process Exit
+  desc: Emit process exit evidence for the platform process-lifecycle adapter.
+  condition: evt.type = procexit and thread.ismain = true
+  output: >
+    process exit evt.num=%evt.num evt.rawres=%evt.rawres proc.pid=%proc.pid proc.vpid=%proc.vpid
+    proc.ppid=%proc.ppid proc.pvpid=%proc.pvpid proc.pid.ts=%proc.pid.ts proc.name=%proc.name
+    proc.exepath=%proc.exepath proc.cmdline=%proc.cmdline proc.tty=%proc.tty
+    user.uid=%user.uid group.gid=%group.gid container.id=%container.id
+    container.name=%container.name
+  priority: NOTICE
+  source: syscall
+  tags: [platform, process, lifecycle]
+
+- rule: Platform File Mutation
+  desc: Emit bounded file mutation evidence for the platform file adapter.
+  condition: ((evt.type in (open,openat,openat2) and evt.is_open_write=true) or evt.type in (creat,write,pwrite,pwrite64,truncate,ftruncate,unlink,unlinkat,rename,renameat,renameat2,chmod,fchmod,fchmodat,chown,fchown,fchownat)) and ((fd.name exists and not fd.name startswith /output and not fd.name startswith /data) or (evt.abspath.src exists and not evt.abspath.src startswith /output and not evt.abspath.src startswith /data) or (evt.abspath.dst exists and not evt.abspath.dst startswith /output and not evt.abspath.dst startswith /data) or (evt.arg.path exists and not evt.arg.path startswith /output and not evt.arg.path startswith /data) or (evt.arg.name exists and not evt.arg.name startswith /output and not evt.arg.name startswith /data) or (evt.arg.oldpath exists and not evt.arg.oldpath startswith /output and not evt.arg.oldpath startswith /data))
+  output: >
+    file mutation evt.num=%evt.num evt.type=%evt.type evt.rawres=%evt.rawres
+    fd.name=%fd.name fd.dev=%fd.dev fd.ino=%fd.ino fd.type=%fd.type
+    evt.path=%evt.arg.path evt.name=%evt.arg.name evt.oldpath=%evt.arg.oldpath evt.newpath=%evt.arg.newpath
+    evt.abspath.src=%evt.abspath.src evt.abspath.dst=%evt.abspath.dst evt.flags=%evt.arg.flags
+    proc.pid=%proc.pid proc.pid.ts=%proc.pid.ts proc.name=%proc.name proc.exepath=%proc.exepath
+    user.uid=%user.uid group.gid=%group.gid container.id=%container.id
+  priority: NOTICE
+  source: syscall
+  tags: [platform, file, mutation]
+
+- rule: Platform Network Operation
+  desc: Emit endpoint socket-operation evidence without packet or payload content.
+  condition: evt.type in (connect,accept,bind,listen,close,sendto,recvfrom) and fd.type in (ipv4,ipv6)
+  output: >
+    network operation evt.num=%evt.num evt.type=%evt.type evt.rawres=%evt.rawres
+    fd.num=%fd.num fd.type=%fd.type fd.l4proto=%fd.l4proto
+    fd.lip=%fd.lip fd.lport=%fd.lport fd.rip=%fd.rip fd.rport=%fd.rport
+    fd.sip=%fd.sip fd.sport=%fd.sport fd.cip=%fd.cip fd.cport=%fd.cport
+    proc.pid=%proc.pid thread.tid=%thread.tid proc.pid.ts=%proc.pid.ts
+    proc.name=%proc.name proc.exepath=%proc.exepath user.uid=%user.uid
+    container.id=%container.id
+  priority: NOTICE
+  source: syscall
+  tags: [platform, network, socket]

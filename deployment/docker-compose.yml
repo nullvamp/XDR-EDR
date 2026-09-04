@@ -1,0 +1,184 @@
+x-logging: &bounded-logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+x-service: &service
+  image: deployment-gateway:latest
+  build:
+    context: ..
+    dockerfile: deployment/docker/service.Dockerfile
+  restart: unless-stopped
+  logging: *bounded-logging
+  environment: &service-env
+    ASPNETCORE_URLS: http://+:8080
+    PLATFORM_ENVIRONMENT: compose
+    PLATFORM_ADAPTER_MODE: production
+    PLATFORM_REGION: local
+    PLATFORM_DATA_DIRECTORY: /data
+    PLATFORM_JWT_ISSUER: security-platform
+    PLATFORM_JWT_AUDIENCE: security-platform-api
+    PLATFORM_JWT_SIGNING_KEY: ${PLATFORM_JWT_SIGNING_KEY:?set PLATFORM_JWT_SIGNING_KEY}
+    PLATFORM_BOOTSTRAP_USER: ${PLATFORM_BOOTSTRAP_USER:-admin}
+    PLATFORM_BOOTSTRAP_PASSWORD: ${PLATFORM_BOOTSTRAP_PASSWORD:?set PLATFORM_BOOTSTRAP_PASSWORD}
+    PLATFORM_REGISTRY_URL: http://gateway:8080
+    PLATFORM_DATABASE_URL: Host=postgres;Database=platform;Username=platform;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD};Maximum Pool Size=20;Connection Idle Lifetime=30;Connection Pruning Interval=5;Timeout=5
+    PLATFORM_MESSAGEBUS_URL: nats://nats:4222
+    PLATFORM_OBJECTSTORE_URL: http://minio:9000
+    PLATFORM_SEARCH_URL: http://opensearch:9200
+    PLATFORM_ENROLLMENT_PEPPER: ${PLATFORM_ENROLLMENT_PEPPER:?set PLATFORM_ENROLLMENT_PEPPER}
+    PLATFORM_BOOTSTRAP_TENANT_ID: ${PLATFORM_BOOTSTRAP_TENANT_ID:-00000000-0000-0000-0000-000000000002}
+    PLATFORM_MANAGED_CLIENTS: ${PLATFORM_MANAGED_CLIENTS:-00000000-0000-0000-0000-000000000002=Primary client}
+    PLATFORM_OBJECTSTORE_ACCESS_KEY: ${MINIO_APP_USER:?set MINIO_APP_USER}
+    PLATFORM_OBJECTSTORE_SECRET_KEY: ${MINIO_APP_PASSWORD:?set MINIO_APP_PASSWORD}
+    PLATFORM_CA_PFX_PATH: /certificates/ca.pfx
+    PLATFORM_CA_PFX_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    PLATFORM_SERVER_PFX_PATH: /certificates/gateway.pfx
+    PLATFORM_SERVER_PFX_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+  volumes: ["./certificates:/certificates:ro"]
+  networks: [platform]
+  depends_on:
+    postgres: {condition: service_healthy}
+    nats: {condition: service_started}
+    minio-init: {condition: service_completed_successfully}
+    opensearch: {condition: service_healthy}
+services:
+  gateway:
+    <<: *service
+    environment: {<<: *service-env, PLATFORM_SERVICE_NAME: gateway, PLATFORM_INSTANCE_ID: gateway-a, PLATFORM_REGISTRY_URL: ""}
+    ports: ["8080:8080", "8443:8443"]
+    volumes: ["gateway-data:/data", "./certificates:/certificates:ro"]
+  gateway-b:
+    <<: *service
+    profiles: ["ha"]
+    environment: {<<: *service-env, PLATFORM_SERVICE_NAME: gateway, PLATFORM_INSTANCE_ID: gateway-b, PLATFORM_REGISTRY_URL: ""}
+    ports: ["8081:8080", "8444:8443"]
+    volumes: ["gateway-data:/data", "./certificates:/certificates:ro"]
+  gateway-recovery:
+    <<: *service
+    profiles: ["dr"]
+    environment: {<<: *service-env, PLATFORM_SERVICE_NAME: recovery-validator, PLATFORM_INSTANCE_ID: recovery-validator, PLATFORM_DATABASE_URL: "Host=postgres;Database=platform_recovery_s28;Username=platform;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}", PLATFORM_REGISTRY_URL: ""}
+    ports: ["8082:8080"]
+    volumes: ["gateway-data:/data", "./certificates:/certificates:ro"]
+  authentication: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: authentication}}
+  endpoints: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: endpoints}}
+  policy: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: policy}}
+  detection: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: detection}}
+  response: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: response}}
+  threat-intelligence: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: threat-intelligence}}
+  timeline: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: timeline}}
+  evidence:
+    <<: *service
+    profiles: ["distributed"]
+    environment: {<<: *service-env, PLATFORM_SERVICE_NAME: evidence}
+    volumes: ["evidence-data:/data", "./certificates:/certificates:ro"]
+  cases: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: cases}}
+  notifications: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: notifications}}
+  plugins: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: plugins}}
+  ai-gateway: {<<: *service, profiles: ["distributed"], environment: {<<: *service-env, PLATFORM_SERVICE_NAME: ai-gateway}}
+  falco:
+    image: falcosecurity/falco:0.44.1
+    privileged: true
+    restart: unless-stopped
+    logging: *bounded-logging
+    command: ["falco", "-o", "engine.kind=modern_ebpf", "-o", "json_output=true", "-o", "stdout_output.enabled=false", "-o", "file_output.enabled=true", "-o", "file_output.filename=/output/process-events.jsonl", "-r", "/etc/falco/platform_process_rules.yaml"]
+    volumes:
+      - falco-output:/output
+      - ./falco/platform_process_rules.yaml:/etc/falco/platform_process_rules.yaml:ro
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /etc:/host/etc:ro
+    networks: [platform]
+  agent:
+    build: {context: .., dockerfile: deployment/docker/agent.Dockerfile}
+    restart: unless-stopped
+    logging: *bounded-logging
+    environment:
+      PLATFORM_CONTROL_PLANE_URL: https://gateway:8443
+      PLATFORM_CA_CERT_PATH: /certificates/ca.crt
+      PLATFORM_AGENT_DATA: /data
+      PLATFORM_ENVIRONMENT: production
+      PLATFORM_PROCESS_COLLECTOR: falco
+      PLATFORM_FALCO_JSON_PATH: /var/run/platform-falco/process-events.jsonl
+      PLATFORM_FALCO_EVENT_PATH: /var/run/platform-falco/process-events.jsonl
+    volumes: ["agent-data:/data", "./certificates:/certificates:ro", "falco-output:/var/run/platform-falco:ro"]
+    networks: [platform]
+    depends_on: [gateway, falco]
+  postgres:
+    image: postgres:16-alpine
+    logging: *bounded-logging
+    command: ["postgres", "-c", "max_connections=200"]
+    environment: {POSTGRES_DB: platform, POSTGRES_USER: platform, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../storage/migrations/0001_sprint_zero.up.sql:/docker-entrypoint-initdb.d/0001_sprint_zero.up.sql:ro
+      - ../storage/migrations/0002_endpoint_enrollment.up.sql:/docker-entrypoint-initdb.d/0002_endpoint_enrollment.up.sql:ro
+      - ../storage/migrations/0003_endpoint_lifecycle.up.sql:/docker-entrypoint-initdb.d/0003_endpoint_lifecycle.up.sql:ro
+      - ../storage/migrations/0004_process_telemetry.up.sql:/docker-entrypoint-initdb.d/0004_process_telemetry.up.sql:ro
+      - ../storage/migrations/0005_process_policy.up.sql:/docker-entrypoint-initdb.d/0005_process_policy.up.sql:ro
+      - ../storage/migrations/0006_file_telemetry.up.sql:/docker-entrypoint-initdb.d/0006_file_telemetry.up.sql:ro
+      - ../storage/migrations/0007_sprint3g_file_acceptance.up.sql:/docker-entrypoint-initdb.d/0007_sprint3g_file_acceptance.up.sql:ro
+      - ../storage/migrations/0008_registry_telemetry.up.sql:/docker-entrypoint-initdb.d/0008_registry_telemetry.up.sql:ro
+      - ../storage/migrations/0009_network_telemetry.up.sql:/docker-entrypoint-initdb.d/0009_network_telemetry.up.sql:ro
+      - ../storage/migrations/0010_dns_telemetry.up.sql:/docker-entrypoint-initdb.d/0010_dns_telemetry.up.sql:ro
+      - ../storage/migrations/0011_dns_exports.up.sql:/docker-entrypoint-initdb.d/0011_dns_exports.up.sql:ro
+      - ../storage/migrations/0012_module_telemetry.up.sql:/docker-entrypoint-initdb.d/0012_module_telemetry.up.sql:ro
+      - ../storage/migrations/0013_service_task_telemetry.up.sql:/docker-entrypoint-initdb.d/0013_service_task_telemetry.up.sql:ro
+      - ../storage/migrations/0014_persistence_configuration_telemetry.up.sql:/docker-entrypoint-initdb.d/0014_persistence_configuration_telemetry.up.sql:ro
+      - ../storage/migrations/0015_identity_telemetry.up.sql:/docker-entrypoint-initdb.d/0015_identity_telemetry.up.sql:ro
+      - ../storage/migrations/0016_execution_telemetry.up.sql:/docker-entrypoint-initdb.d/0016_execution_telemetry.up.sql:ro
+      - ../storage/migrations/0017_detection_engine.up.sql:/docker-entrypoint-initdb.d/0017_detection_engine.up.sql:ro
+      - ../storage/migrations/0018_correlation_engine.up.sql:/docker-entrypoint-initdb.d/0018_correlation_engine.up.sql:ro
+      - ../storage/migrations/0019_investigation_graph.up.sql:/docker-entrypoint-initdb.d/0019_investigation_graph.up.sql:ro
+      - ../storage/migrations/0020_alert_incident_lifecycle.up.sql:/docker-entrypoint-initdb.d/0020_alert_incident_lifecycle.up.sql:ro
+      - ../storage/migrations/0021_response_engine.up.sql:/docker-entrypoint-initdb.d/0021_response_engine.up.sql:ro
+      - ../storage/migrations/0022_live_response.up.sql:/docker-entrypoint-initdb.d/0022_live_response.up.sql:ro
+      - ../storage/migrations/0023_endpoint_isolation.up.sql:/docker-entrypoint-initdb.d/0023_endpoint_isolation.up.sql:ro
+      - ../storage/migrations/0024_threat_intelligence.up.sql:/docker-entrypoint-initdb.d/0024_threat_intelligence.up.sql:ro
+      - ../storage/migrations/0025_tunnel_analytics.up.sql:/docker-entrypoint-initdb.d/0025_tunnel_analytics.up.sql:ro
+      - ../storage/migrations/0026_playbook_orchestration.up.sql:/docker-entrypoint-initdb.d/0026_playbook_orchestration.up.sql:ro
+      - ../storage/migrations/0027_agent_self_protection.up.sql:/docker-entrypoint-initdb.d/0027_agent_self_protection.up.sql:ro
+      - ../storage/migrations/0028_fleet_updates.up.sql:/docker-entrypoint-initdb.d/0028_fleet_updates.up.sql:ro
+      - ../storage/migrations/0029_high_availability.up.sql:/docker-entrypoint-initdb.d/0029_high_availability.up.sql:ro
+      - ../storage/migrations/0030_capacity_retention.up.sql:/docker-entrypoint-initdb.d/0030_capacity_retention.up.sql:ro
+      - ../storage/migrations/0031_ai_investigation.up.sql:/docker-entrypoint-initdb.d/0031_ai_investigation.up.sql:ro
+      - ../storage/migrations/0032_ai_detection_engineering.up.sql:/docker-entrypoint-initdb.d/0032_ai_detection_engineering.up.sql:ro
+      - ../storage/migrations/0033_enterprise_administration.up.sql:/docker-entrypoint-initdb.d/0033_enterprise_administration.up.sql:ro
+      - ../storage/migrations/0034_forensic_workspace.up.sql:/docker-entrypoint-initdb.d/0034_forensic_workspace.up.sql:ro
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U platform"], interval: 5s, timeout: 3s, retries: 20}
+    networks: [platform]
+  nats:
+    image: nats:2.10-alpine
+    logging: *bounded-logging
+    command: ["-js", "-m", "8222"]
+    networks: [platform]
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    logging: *bounded-logging
+    command: server /data --console-address :9001
+    environment: {MINIO_ROOT_USER: "${MINIO_ROOT_USER:-platform}", MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}"}
+    volumes: ["minio-data:/data"]
+    networks: [platform]
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    logging: *bounded-logging
+    entrypoint: ["/bin/sh", "/config/bootstrap.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-platform}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_APP_USER: ${MINIO_APP_USER:?set MINIO_APP_USER}
+      MINIO_APP_PASSWORD: ${MINIO_APP_PASSWORD:?set MINIO_APP_PASSWORD}
+    volumes:
+      - ./minio/bootstrap.sh:/config/bootstrap.sh:ro
+      - ./minio/platform-app-policy.json:/config/platform-app-policy.json:ro
+    depends_on:
+      minio: {condition: service_started}
+    restart: "no"
+    networks: [platform]
+  opensearch:
+    image: opensearchproject/opensearch:2.19.2
+    logging: *bounded-logging
+    environment: {discovery.type: single-node, DISABLE_SECURITY_PLUGIN: "true", OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m}
+    volumes: ["search-data:/usr/share/opensearch/data"]
+    healthcheck: {test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"], interval: 10s, timeout: 5s, retries: 30}
+    networks: [platform]
+networks: {platform: {driver: bridge}}
+volumes: {gateway-data: {}, evidence-data: {}, agent-data: {}, falco-output: {}, postgres-data: {}, minio-data: {}, search-data: {}}

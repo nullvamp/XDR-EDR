@@ -1,0 +1,15 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.execution_export_jobs;
+DROP TABLE IF EXISTS platform.execution_policy_acknowledgements;
+DROP TABLE IF EXISTS platform.execution_policy_assignments;
+DROP TABLE IF EXISTS platform.execution_policy_versions;
+DROP TABLE IF EXISTS platform.execution_telemetry_health;
+DROP TABLE IF EXISTS platform.execution_section_mappings;
+DROP TABLE IF EXISTS platform.execution_section_entities;
+DROP TABLE IF EXISTS platform.execution_memory_protection_history;
+DROP TABLE IF EXISTS platform.execution_memory_regions;
+DROP TABLE IF EXISTS platform.execution_thread_entities;
+DROP TABLE IF EXISTS platform.execution_process_handle_relationships;
+DROP TABLE IF EXISTS platform.execution_events;
+DROP TABLE IF EXISTS platform.execution_batches;
+COMMIT;

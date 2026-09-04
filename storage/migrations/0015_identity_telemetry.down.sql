@@ -1,0 +1,14 @@
+BEGIN;
+DROP TABLE IF EXISTS platform.identity_export_jobs;
+DROP TABLE IF EXISTS platform.identity_policy_acknowledgements;
+DROP TABLE IF EXISTS platform.identity_policy_assignments;
+DROP TABLE IF EXISTS platform.identity_policy_versions;
+DROP TABLE IF EXISTS platform.identity_telemetry_health;
+DROP TABLE IF EXISTS platform.identity_process_relationships;
+DROP TABLE IF EXISTS platform.identity_privilege_observations;
+DROP TABLE IF EXISTS platform.token_entities;
+DROP TABLE IF EXISTS platform.windows_session_entities;
+DROP TABLE IF EXISTS platform.logon_session_entities;
+DROP TABLE IF EXISTS platform.identity_events;
+DROP TABLE IF EXISTS platform.identity_batches;
+COMMIT;
